@@ -30,6 +30,12 @@ class Package():
 
     def __lt__(self, package2):
         return self.first_sending_option < package2.first_sending_option
+    
+    def push_to_heap(self):
+        if self.is_priority == True:
+            heapq.heappush(vip_heap_dict[(self.destination,self.size)],self)
+        else:
+            heapq.heappush(regular_heap_dict[(self.destination,self.size)],self)
 
 class Destination():
     def __init__(self, id, large_bins=4, medium_bins=6, small_bins=15, is_working=True, neighbors={"big":[],"medium":[],"small":[]}):
@@ -53,6 +59,16 @@ Dest5=Destination(5)
 Dest5.neighbors["big"], Dest5.neighbors["medium"], Dest5.neighbors["small"]=[6,3,4],[6,4,3],[6,4,3]
 Dest6=Destination(6)
 Dest6.neighbors["big"], Dest6.neighbors["medium"], Dest6.neighbors["small"]=[5,4],[4,5],[4,5]
+
+# create 18 package heaps in two dictionareis Vip and regular : the dict key is the heap name (i,j) value heap the 
+vip_heap_dict = {}
+for i in range(6):
+    for j in range(3):
+        vip_heap_dict[i, j] = []
+regular_heap_dict = {}
+for i in range(6):
+    for j in range(3):
+        vip_heap_dict[i, j] = []
 
 P=[]   #Event heap
 NOW=0   #Current simulation time
