@@ -60,7 +60,7 @@ Dest5.neighbors["big"], Dest5.neighbors["medium"], Dest5.neighbors["small"]=[6,3
 Dest6=Destination(6)
 Dest6.neighbors["big"], Dest6.neighbors["medium"], Dest6.neighbors["small"]=[5,4],[4,5],[4,5]
 
-# create 18 package heaps: key is heap name (i,j) value is list which is heap
+# create 18 package heaps in two dictionareis Vip and regular : the dict key is the heap name (i,j) value heap the 
 vip_heap_dict = {}
 for i in range(6):
     for j in range(3):
