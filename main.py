@@ -58,17 +58,17 @@ regular_heap_dict = {}
 for i in range(1,7):
     for j in range(1,4):
         regular_heap_dict[i, j] = []
-destination = {}
+destinations = {}
 for i in range(1,7):
-    destination[i] = Destination(i)
+    destinations[i] = Destination(i)
 
 #Define Destinations neigbors 
-destination[1].neighbors["big"], destination[1].neighbors["medium"], destination[1].neighbors["small"]=[2,3,4],[4,2,3],[4,2,3]
-destination[2].neighbors["big"], destination[2].neighbors["medium"], destination[2].neighbors["small"]=[1,4],[1,4],[1,4]
-destination[3].neighbors["big"], destination[3].neighbors["medium"], destination[3].neighbors["small"]=[1,5,4],[4,1,5],[4,1,5]
-destination[4].neighbors["big"], destination[4].neighbors["medium"], destination[4].neighbors["small"]=[1,5,2,6,3],[6,2,5,1,3],[6,2,5,1,3]
-destination[5].neighbors["big"], destination[5].neighbors["medium"], destination[5].neighbors["small"]=[6,3,4],[6,4,3],[6,4,3]
-destination[6].neighbors["big"], destination[6].neighbors["medium"], destination[6].neighbors["small"]=[4,5],[4,5],[4,5]
+destinations[1].neighbors["big"], destinations[1].neighbors["medium"], destinations[1].neighbors["small"]=[2,3,4],[4,2,3],[4,2,3]
+destinations[2].neighbors["big"], destinations[2].neighbors["medium"], destinations[2].neighbors["small"]=[1,4],[1,4],[1,4]
+destinations[3].neighbors["big"], destinations[3].neighbors["medium"], destinations[3].neighbors["small"]=[1,5,4],[4,1,5],[4,1,5]
+destinations[4].neighbors["big"], destinations[4].neighbors["medium"], destinations[4].neighbors["small"]=[1,5,2,6,3],[6,2,5,1,3],[6,2,5,1,3]
+destinations[5].neighbors["big"], destinations[5].neighbors["medium"], destinations[5].neighbors["small"]=[6,3,4],[6,4,3],[6,4,3]
+destinations[6].neighbors["big"], destinations[6].neighbors["medium"], destinations[6].neighbors["small"]=[4,5],[4,5],[4,5]
 
 P=[]   #Event heap
 NOW=0   #Current simulation time
@@ -118,5 +118,4 @@ def package_arrival_execution(NOW): #Create daily packages
                     add_x_packages_to_heap(NOW+1,i,j,x)
                 else:
                     add_x_packages_to_heap(NOW,i,j,x)
-    return None ### ADD package send creation
-    
+    return None ### ADD packa
