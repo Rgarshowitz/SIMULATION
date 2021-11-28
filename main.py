@@ -89,7 +89,7 @@ loc_size_destributions = {(1,1):1,  (1,2):3, (1,3):7,
 def add_x_packages_to_heap(NOW,i,j,x): #adds x packages to heap (i,j)
     t = 0
     while t<x:
-        Package(j,NOW,i).push_to_heap()
+        Package(j,NOW,destinations[i]).push_to_heap()
         t+=1
     return None
 
@@ -104,13 +104,25 @@ def insert_to_bin(cur_dest,cur_pack,i,j,NOW):
         cur_pack.ft_sent = NOW
         cur_pack.days_in_center = (NOW - cur_pack.first_sending_option)
 
+def update_days_to_delivery(package):
+    if package.days_in_center in days_to_delivery[package.destination].keys():
+        days_to_delivery[package.destination][package.days_in_center]+=1
+    else:
+        days_to_delivery[package.destination][package.days_in_center]=1
+
+# if package.is_priority==False:
+#    if mt.floor[package.ft_sent-package.first_sending_option] in days_to_delivery[package.destination].keys():
+#        days_to_delivery[package.destination][mt.floor[package.ft_sent-package.first_sending_option]]+=1
+#    else:
+#        days_to_delivery[package.destination][mt.floor[package.ft_sent-package.first_sending_option]]=1
+# else:
+
 
 ### main functions ####
 def package_arrival_execution(NOW): #Create daily packages
     for i in range(1,7):
         for j in range(1,4):
             x = np.random.poisson(loc_size_destributions[(i,j)])
-            #print(f'destination:{i},size:{j} x:{x}')
             if F ==0:
                 add_x_packages_to_heap(NOW,i,j,x)
             else:
@@ -119,3 +131,75 @@ def package_arrival_execution(NOW): #Create daily packages
                 else:
                     add_x_packages_to_heap(NOW,i,j,x)
     return None ### ADD packa
+
+def package_collection_creation(package,p_cur_location,NOW):
+    x,y = np.random.uniform(0,1), np.random.uniform(0,17.983/24)
+    if package.destination.id==p_cur_location:
+        if x<0.4:
+            Event(NOW+y,"Collection",package.destination,package)
+        elif x<0.6:
+            Event(NOW+1+y,"Collection",package.destination,package)
+        elif x<0.9:
+            Event(NOW+2+y,"Collection",package.destination,package)
+        else:
+            Event(NOW+3+y,"Collection",package.destination,package)
+    else:
+        if x<0.2:
+            Event(NOW+y,"Collection",p_cur_location,package)
+        elif x<0.4:
+            Event(NOW+1+y,"Collection",p_cur_location,package)
+        elif x<0.7:
+            Event(NOW+2+y,"Collection",p_cur_location,package)
+        elif x<0.9:
+            Event(NOW+3+y,"Collection",p_cur_location,package)
+        else:
+            package.is_priority=False
+            global returned_num
+            if (NOW+5)%7==0:
+                package.first_sending_option=mt.floor(NOW+6)
+            else:
+                package.first_sending_option=mt.floor(NOW+5)
+            returned_num+=1
+            package.push_to_heap()
+              
+
+def package_collection_execution(package):
+    if package.destination.is_working==True:
+        x=np.random.uniform(0,1)
+        if x>0.01:
+            destinations[package.destination].available_bins[package.bin_size]+=1
+            if package.is_priority==False:
+                update_days_to_delivery(package)
+                return
+        else:
+            w=np.random.uniform(1/24,5/24)
+            package.destination.is_working=False
+            ### def fault_termination_creation ###
+    if package.is_priority==True:
+        ### def collect_after_fault ###
+        return
+    if ((NOW+1)-package.first_sending_option)<4:
+        ### def collect_after_fault ###
+        None
+    else:
+        global returned_num
+        package.is_priority=True
+        if (NOW+1)%7==0:
+            package.first_sending_option = mt.floor(NOW+2)
+            returned_num+=1
+            package.push_to_heap()
+        else:
+            package.first_sending_option = mt.floor(NOW+1)
+            returned_num+=1
+            package.push_to_heap()
+
+def collect_after_fault_creation(package):
+    global returned_num
+    y = np.random.uniform(26/24, 23.983/24)
+    returned_num+=1
+    Event(mt.floor(NOW+1)+y, "Collect After Fault", package.cur_location, package)
+
+def end_location_fault(destination):
+    t = np.random.uniform(1/24,5/24)
+    Event(NOW+t, "End Location Fault", destination)
+
