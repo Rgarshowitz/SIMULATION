@@ -99,16 +99,16 @@ def insert_to_bin(cur_dest,cur_pack,i,j,NOW):
     cur_pack.cur_location = i
     if cur_pack.is_priority:
         cur_pack.st_sent = NOW
-        cur_pack.days_in_center += (NOW - cur_pack.first_sending_option)
+        cur_pack.days_in_center += (cur_pack.st_sent - cur_pack.first_sending_option)
     else:
         cur_pack.ft_sent = NOW
-        cur_pack.days_in_center = (NOW - cur_pack.first_sending_option)
+        cur_pack.days_in_center = (cur_pack.ft_sent - cur_pack.first_sending_option)
 
 def update_days_to_delivery(package):
-    if package.days_in_center in days_to_delivery[package.destination].keys():
-        days_to_delivery[package.destination][package.days_in_center]+=1
+    if package.days_in_center in days_to_delivery[package.destination.id].keys():
+        days_to_delivery[package.destination.id][package.days_in_center]+=1
     else:
-        days_to_delivery[package.destination][package.days_in_center]=1
+        days_to_delivery[package.destination.id][package.days_in_center]=1
         
         
 def next_point(i,j):
@@ -210,7 +210,7 @@ def package_collection_execution(package):
     if package.destination.is_working==True:
         x=np.random.uniform(0,1)
         if x>0.01:
-            destinations[package.destination].available_bins[package.bin_size]+=1
+            destinations[package.destination.id].available_bins[package.bin_size]+=1
             if package.is_priority==False:
                 update_days_to_delivery(package)
                 return
@@ -242,11 +242,12 @@ def collect_after_fault_creation(package):
     returned_num+=1
     Event(mt.floor(NOW+1)+y, "Collect After Fault", package.cur_location, package)
 
-def end_location_fault(destination):
+def end_location_fault_creations(NOW,destination):
     t = np.random.uniform(1/24,5/24)
     Event(NOW+t, "End Location Fault", destination)
 
-
+def end_location_fault_excecution(destination):
+    destination.is_working = True
 
 def send_packages_execution(NOW):
     curr_point = (1,1) # (i,j)
