@@ -49,42 +49,6 @@ class Destination():
         return f'loc ID:{self.id} L:{self.available_bins[1]} M:{self.available_bins[2]} S:{self.available_bins[3]}, is working: {self.is_working}'
 
 
-# create 18 package heaps in two dictionareis Vip and regular : the dict key is the heap name (i,j) value heap the 
-vip_heap_dict = {}
-for i in range(1,7):
-    for j in range(1,4):
-        vip_heap_dict[i, j] = []
-regular_heap_dict = {}
-for i in range(1,7):
-    for j in range(1,4):
-        regular_heap_dict[i, j] = []
-destinations = {}
-for i in range(1,7):
-    destinations[i] = Destination(i)
-
-#Define Destinations neigbors 
-destinations[1].neighbors["big"], destinations[1].neighbors["medium"], destinations[1].neighbors["small"]=[2,3,4],[4,2,3],[4,2,3]
-destinations[2].neighbors["big"], destinations[2].neighbors["medium"], destinations[2].neighbors["small"]=[1,4],[1,4],[1,4]
-destinations[3].neighbors["big"], destinations[3].neighbors["medium"], destinations[3].neighbors["small"]=[1,5,4],[4,1,5],[4,1,5]
-destinations[4].neighbors["big"], destinations[4].neighbors["medium"], destinations[4].neighbors["small"]=[1,5,2,6,3],[6,2,5,1,3],[6,2,5,1,3]
-destinations[5].neighbors["big"], destinations[5].neighbors["medium"], destinations[5].neighbors["small"]=[6,3,4],[6,4,3],[6,4,3]
-destinations[6].neighbors["big"], destinations[6].neighbors["medium"], destinations[6].neighbors["small"]=[4,5],[4,5],[4,5]
-
-P=[]   #Event heap
-NOW=0   #Current simulation time
-simulation_time=91   #Overall simulation running time
-F=0   #indicates weather it is the first day for the simulation
-returned_num=0   #Number of packages that has been returned to the logistics center
-returned_clients_num=0   # number of clients that had to come back later because of destination malfunction
-packages_in_center={"big":{}, "medium":{}, "small":{}}   #Dictionary that counts how many packages are left each days in center by category
-days_to_delivery={1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6:{}}   # Counts how much time passed for each package in center for each destination, by days
-loc_size_destributions = {(1,1):1,  (1,2):3, (1,3):7,
-                          (2,1):1.5,(2,2):2, (2,3):8,
-                          (3,1):2,  (3,2):4, (3,3):12,
-                          (4,1):3,  (4,2):1, (4,3):5,
-                          (5,1):1,  (5,2):3, (5,3):8,
-                          (6,1):1.5,(6,2):1, (6,3):3 } 
-
 #### sub Funcitons ####
 def add_x_packages_to_heap(NOW,i,j,x): #adds x packages to heap (i,j)
     t = 0
@@ -114,7 +78,6 @@ def update_days_to_delivery(package):
 def next_point(i,j):
     if j ==3:
         if i == 6:
-            ### create package arrival###
             i+=1
             return (i,j)
         else:
@@ -131,18 +94,19 @@ def place_pack(heap,curr_point,cur_dest):
     if cur_dest.available_bins[curr_point[1]] > 0:
         insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1],NOW)
         print(f'placed item size {curr_point[1]} in bin {curr_point[1]} at {cur_dest}')
-        ### add create package collect event####
+        package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
 
     elif curr_point[1]-1 >= 1:
         if cur_dest.available_bins[curr_point[1]-1] > 0:
             insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-1,NOW)
             print(f'placed item size {curr_point[1]} in bin {curr_point[1]-1} at {cur_dest}')
-            ### add create package collect event ###
+            package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
             
     elif curr_point[1]-2 >= 1:
         if cur_dest.available_bins[curr_point[1]-2] > 0:
             insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-2,NOW)
             print(f'placed item size {curr_point[1]} in bin {curr_point[1]-2} at {cur_dest}')
+            package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
 
     else:  
         cur_pack.push_to_heap()
@@ -152,16 +116,28 @@ def place_pack(heap,curr_point,cur_dest):
 
     return curr_point
 
-
-# if package.is_priority==False:
-#    if mt.floor[package.ft_sent-package.first_sending_option] in days_to_delivery[package.destination].keys():
-#        days_to_delivery[package.destination][mt.floor[package.ft_sent-package.first_sending_option]]+=1
-#    else:
-#        days_to_delivery[package.destination][mt.floor[package.ft_sent-package.first_sending_option]]=1
-# else:
+def update_packages_in_center():
+    global packages_in_center
+    for j in range(1,4):
+        total_packages=0
+        for i in range(1,7):
+            total_packages+=len(regular_heap_dict[i,j])+len(vip_heap_dict[i,j])
+        if total_packages in packages_in_center[j].keys():
+            packages_in_center[j][total_packages]+=1
+        else:
+            packages_in_center[j][total_packages]=1
+    
 
 
 ### main functions ####
+def package_arrival_creation(NOW):
+    global F
+    if F==0:
+        Event(NOW,"Arrival")
+        F+=1
+    else:
+        Event(mt.ceil(NOW), "Arrival")
+
 def package_arrival_execution(NOW): #Create daily packages
     for i in range(1,7):
         for j in range(1,4):
@@ -173,7 +149,25 @@ def package_arrival_execution(NOW): #Create daily packages
                     add_x_packages_to_heap(NOW+1,i,j,x)
                 else:
                     add_x_packages_to_heap(NOW,i,j,x)
-    return None ### ADD packa
+    send_packages_creation(NOW)
+
+def send_packages_creation(NOW):
+    Event(NOW+6/24,"Distribute")
+
+def send_packages_execution(NOW):
+    curr_point = (1,1) # (i,j)
+    while curr_point[0] < 7:
+        cur_dest = destinations[curr_point[0]]
+        if len(vip_heap_dict[(curr_point[0],curr_point[1])]) > 0:
+            curr_point = place_pack(vip_heap_dict,curr_point,cur_dest)
+        elif len(regular_heap_dict[(curr_point[0],curr_point[1])]) > 0:
+            curr_point = place_pack(regular_heap_dict,curr_point,cur_dest)
+        else:
+            print(f' done with ({curr_point})')
+            curr_point = next_point(curr_point[0],curr_point[1])
+            print(f' next point:({curr_point})')
+    update_packages_in_center()
+    package_arrival_creation(NOW)
 
 def package_collection_creation(package,p_cur_location,NOW):
     x,y = np.random.uniform(0,1), np.random.uniform(0,17.983/24)
@@ -206,7 +200,7 @@ def package_collection_creation(package,p_cur_location,NOW):
             package.push_to_heap()
               
 
-def package_collection_execution(package):
+def package_collection_execution(NOW,package):
     if package.destination.is_working==True:
         x=np.random.uniform(0,1)
         if x>0.01:
@@ -217,13 +211,13 @@ def package_collection_execution(package):
         else:
             w=np.random.uniform(1/24,5/24)
             package.destination.is_working=False
-            ### def fault_termination_creation ###
+            end_location_fault_creation(NOW,package.destination)
     if package.is_priority==True:
-        ### def collect_after_fault ###
+        collect_after_fault_creation(NOW,package)
         return
-    if ((NOW+1)-package.first_sending_option)<4:
-        ### def collect_after_fault ###
-        None
+    elif ((NOW+1)-package.first_sending_option)<4:
+        collect_after_fault_creation(NOW,package)
+        return
     else:
         global returned_num
         package.is_priority=True
@@ -236,31 +230,75 @@ def package_collection_execution(package):
             returned_num+=1
             package.push_to_heap()
 
-def collect_after_fault_creation(package):
-    global returned_num
-    y = np.random.uniform(26/24, 23.983/24)
-    returned_num+=1
-    Event(mt.floor(NOW+1)+y, "Collect After Fault", package.cur_location, package)
-
-def end_location_fault_creations(NOW,destination):
+def end_location_fault_creation(NOW,destination):
     t = np.random.uniform(1/24,5/24)
     Event(NOW+t, "End Location Fault", destination)
 
 def end_location_fault_excecution(destination):
     destination.is_working = True
 
-def send_packages_execution(NOW):
-    curr_point = (1,1) # (i,j)
-    while curr_point[0] < 7:
-        cur_dest = destinations[curr_point[0]]
-        if len(vip_heap_dict[(curr_point[0],curr_point[1])]) > 0:
-            curr_point = place_pack(vip_heap_dict,curr_point,cur_dest)
-        elif len(regular_heap_dict[(curr_point[0],curr_point[1])]) > 0:
-            curr_point = place_pack(regular_heap_dict,curr_point,cur_dest)
-        else:
-            print(f' done with ({curr_point})')
-            curr_point = next_point(curr_point[0],curr_point[1])
-            print(f' next point:({curr_point})')
-        
-            
-            
+def collect_after_fault_creation(NOW,package):
+    global returned_num
+    y = np.random.uniform(6/24, 23.983/24)
+    returned_num+=1
+    Event(mt.ceil(NOW)+y, "Collect After Fault", package.cur_location, package)
+
+def collect_after_fault_execution(NOW, package):
+    global returned_clients_num
+    returned_clients_num+=1
+    package_collection_execution(NOW, package)
+
+
+# create 18 package heaps in two dictionareis Vip and regular : the dict key is the heap name (i,j) value heap the 
+vip_heap_dict = {}
+for i in range(1,7):
+    for j in range(1,4):
+        vip_heap_dict[i, j] = []
+regular_heap_dict = {}
+for i in range(1,7):
+    for j in range(1,4):
+        regular_heap_dict[i, j] = []
+destinations = {}
+for i in range(1,7):
+    destinations[i] = Destination(i)
+
+#Define Destinations neigbors 
+destinations[1].neighbors["big"], destinations[1].neighbors["medium"], destinations[1].neighbors["small"]=[2,3,4],[4,2,3],[4,2,3]
+destinations[2].neighbors["big"], destinations[2].neighbors["medium"], destinations[2].neighbors["small"]=[1,4],[1,4],[1,4]
+destinations[3].neighbors["big"], destinations[3].neighbors["medium"], destinations[3].neighbors["small"]=[1,5,4],[4,1,5],[4,1,5]
+destinations[4].neighbors["big"], destinations[4].neighbors["medium"], destinations[4].neighbors["small"]=[1,5,2,6,3],[6,2,5,1,3],[6,2,5,1,3]
+destinations[5].neighbors["big"], destinations[5].neighbors["medium"], destinations[5].neighbors["small"]=[6,3,4],[6,4,3],[6,4,3]
+destinations[6].neighbors["big"], destinations[6].neighbors["medium"], destinations[6].neighbors["small"]=[4,5],[4,5],[4,5]
+
+P=[]   #Event heap
+NOW=0   #Current simulation time
+simulation_time=91   #Overall simulation running time
+F=0   #indicates weather it is the first day for the simulation
+returned_num=0   #Number of packages that has been returned to the logistics center
+returned_clients_num=0   # number of clients that had to come back later because of destination malfunction
+packages_in_center={1:{}, 2:{}, 3:{}}   #Dictionary that counts how many packages are left each days in center by size
+days_to_delivery={1:{}, 2:{}, 3:{}, 4:{}, 5:{}, 6:{}}   # Counts how much time passed for each package in center for each destination, by days
+loc_size_destributions = {(1,1):1,  (1,2):3, (1,3):7,
+                          (2,1):1.5,(2,2):2, (2,3):8,
+                          (3,1):2,  (3,2):4, (3,3):12,
+                          (4,1):3,  (4,2):1, (4,3):5,
+                          (5,1):1,  (5,2):3, (5,3):8,
+                          (6,1):1.5,(6,2):1, (6,3):3 } 
+
+Event(NOW, "Arrival")
+while NOW < 90:
+    cur_event=heapq.heappop(P)
+    NOW=cur_event.time
+    if cur_event.type=="Arrival":
+        package_arrival_execution(NOW)
+    elif cur_event.type=="Distribute":
+        send_packages_execution(NOW)
+    elif cur_event.type=="Collection":
+        package_collection_execution(NOW,cur_event.package)
+    elif cur_event.type=="End Location Fault":
+        end_location_fault_excecution(cur_event.destination)
+    else:
+        collect_after_fault_execution(NOW, cur_event.package)
+    print(returned_num)
+    print(returned_clients_num)
+
