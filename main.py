@@ -28,16 +28,16 @@ class Package():
         self.days_in_center=days_in_center
 
     def __repr__(self):
-        return f'size: {self.size} destination:{self.destination} first_sending_option:{self.first_sending_option}'
+        return f'size: {self.size} destination:{self.destination.id} first_sending_option:{self.first_sending_option}'
     
     def __lt__(self, package2):
         return self.first_sending_option < package2.first_sending_option
     
     def push_to_heap(self):
         if self.is_priority == True:
-            heapq.heappush(vip_heap_dict[(self.destination,self.size)],self)
+            heapq.heappush(vip_heap_dict[(self.destination.id,self.size)],self)
         else:
-            heapq.heappush(regular_heap_dict[(self.destination,self.size)],self)
+            heapq.heappush(regular_heap_dict[(self.destination.id,self.size)],self)
 
 class Destination():
     def __init__(self, id ):
@@ -109,6 +109,49 @@ def update_days_to_delivery(package):
         days_to_delivery[package.destination][package.days_in_center]+=1
     else:
         days_to_delivery[package.destination][package.days_in_center]=1
+        
+        
+def next_point(i,j):
+    if j ==3:
+        if i == 6:
+            ### create package arrival###
+            i+=1
+            return (i,j)
+        else:
+            i += 1 
+            j = 1
+            return (i,j)
+    else:
+        j+=1
+        return (i,j)
+    
+def place_pack(heap,curr_point,cur_dest):
+    cur_pack = heapq.heappop(heap[(curr_point[0],curr_point[1])])
+
+    if cur_dest.available_bins[curr_point[1]] > 0:
+        insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1],NOW)
+        print(f'placed item size {curr_point[1]} in bin {curr_point[1]} at {cur_dest}')
+        ### add create package collect event####
+
+    elif curr_point[1]-1 >= 1:
+        if cur_dest.available_bins[curr_point[1]-1] > 0:
+            insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-1,NOW)
+            print(f'placed item size {curr_point[1]} in bin {curr_point[1]-1} at {cur_dest}')
+            ### add create package collect event ###
+            
+    elif curr_point[1]-2 >= 1:
+        if cur_dest.available_bins[curr_point[1]-2] > 0:
+            insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-2,NOW)
+            print(f'placed item size {curr_point[1]} in bin {curr_point[1]-2} at {cur_dest}')
+
+    else:  
+        cur_pack.push_to_heap()
+        print(f' done with ({curr_point})')
+        curr_point = next_point(curr_point[0],curr_point[1])
+        print(f' next point:({curr_point})')
+
+    return curr_point
+
 
 # if package.is_priority==False:
 #    if mt.floor[package.ft_sent-package.first_sending_option] in days_to_delivery[package.destination].keys():
@@ -203,3 +246,20 @@ def end_location_fault(destination):
     t = np.random.uniform(1/24,5/24)
     Event(NOW+t, "End Location Fault", destination)
 
+
+
+def send_packages_execution(NOW):
+    curr_point = (1,1) # (i,j)
+    while curr_point[0] < 7:
+        cur_dest = destinations[curr_point[0]]
+        if len(vip_heap_dict[(curr_point[0],curr_point[1])]) > 0:
+            curr_point = place_pack(vip_heap_dict,curr_point,cur_dest)
+        elif len(regular_heap_dict[(curr_point[0],curr_point[1])]) > 0:
+            curr_point = place_pack(regular_heap_dict,curr_point,cur_dest)
+        else:
+            print(f' done with ({curr_point})')
+            curr_point = next_point(curr_point[0],curr_point[1])
+            print(f' next point:({curr_point})')
+        
+            
+            
