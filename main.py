@@ -64,10 +64,10 @@ def insert_to_bin(cur_dest,cur_pack,i,j,NOW):
     cur_pack.cur_location = i
     if cur_pack.is_priority:
         cur_pack.st_sent = NOW
-        cur_pack.days_in_center += (cur_pack.st_sent - cur_pack.first_sending_option)
+        cur_pack.days_in_center += mt.floor(cur_pack.st_sent - cur_pack.first_sending_option)
     else:
         cur_pack.ft_sent = NOW
-        cur_pack.days_in_center = (cur_pack.ft_sent - cur_pack.first_sending_option)
+        cur_pack.days_in_center = mt.floor(cur_pack.ft_sent - cur_pack.first_sending_option)
 
 def update_days_to_delivery(package):
     if package.days_in_center in days_to_delivery[package.destination.id].keys():
@@ -129,15 +129,9 @@ def update_packages_in_center():
             packages_in_center[j][total_packages]=1
     
 
-
 ### main functions ####
 def package_arrival_creation(NOW):
-    global F
-    if F==0:
-        Event(NOW,"Arrival")
-        F+=1
-    else:
-        Event(mt.ceil(NOW), "Arrival")
+     Event(mt.ceil(NOW), "Arrival")
 
 def package_arrival_execution(NOW): #Create daily packages
     for i in range(1,7):
