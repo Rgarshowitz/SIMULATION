@@ -88,6 +88,21 @@ def next_point(i,j):
     else:
         j+=1
         return (i,j)
+
+def simple_place(cur_pack,i,j,NOW):
+    size_count=j
+    while size_count-1>=0:
+        neighbors=destinations[i].neighbors[size_count]
+        for k in range(len(neighbors)):
+            cur_dest=destinations[neighbors[k]]
+            if cur_dest.available_bins[i]>0:
+                insert_to_bin(cur_dest,cur_pack,i,j,NOW)
+                package_collection_creation(cur_pack, cur_pack.location, NOW)
+        size_count-=1
+        
+                 
+
+
     
 def place_pack(heap,curr_point,cur_dest):
     cur_pack = heapq.heappop(heap[(curr_point[0],curr_point[1])])
@@ -138,7 +153,6 @@ def update_packages_in_center():
             packages_in_center[j][total_packages]+=1
         else:
             packages_in_center[j][total_packages]=1
-        print(packages_in_center[j])
     
 
 ### main functions ####
@@ -177,6 +191,22 @@ def send_packages_execution(NOW):
     update_packages_in_center()
     print(f'time: {NOW} - daily packages sent')
     package_arrival_creation(NOW)
+
+def send_packages_execution2(NOW):
+    send_packages_execution(NOW)
+    i,j = 1,1
+    while i < 7:
+        if len(regular_heap_dict[i,j])>0:
+            cur_pack=heapq.heappop(regular_heap_dict[i,j])
+            simple_place(cur_pack,i,j,NOW)
+        elif j==3:
+            if i==6:
+                return
+            else:
+                i+=1
+                j=0
+        else:
+            j+=1
 
 def package_collection_creation(package,p_cur_location,NOW):
     x,y = np.random.uniform(0,1), np.random.uniform(0,17.983/24)
