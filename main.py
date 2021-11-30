@@ -97,18 +97,29 @@ def place_pack(heap,curr_point,cur_dest):
         #print(f'placed item size {curr_point[1]} in bin {curr_point[1]} at {cur_dest}')
         package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
 
-    elif curr_point[1]-1 >= 1:
-        if cur_dest.available_bins[curr_point[1]-1] > 0:
-            insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-1,NOW)
-            #print(f'placed item size {curr_point[1]} in bin {curr_point[1]-1} at {cur_dest}')
-            package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
-            
-    elif curr_point[1]-2 >= 1:
-        if cur_dest.available_bins[curr_point[1]-2] > 0:
-            insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-2,NOW)
-            #print(f'placed item size {curr_point[1]} in bin {curr_point[1]-2} at {cur_dest}')
-            package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
-
+    elif curr_point[1]-1 >= 1:  #Am I small/Medium
+        if curr_point[1]-2 >=1:  # Am I small?
+            if cur_dest.available_bins[curr_point[1]-1] > 0:  # are there medium bins available?
+                insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-1,NOW)
+                package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
+                return curr_point
+            elif cur_dest.available_bins[curr_point[1]-2] > 0:   # are there big bins available?
+                insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-2,NOW)
+                package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
+                return curr_point
+            else:
+                cur_pack.push_to_heap()
+                curr_point = next_point(curr_point[0],curr_point[1])
+                return curr_point
+        else:   # I am mediumn
+            if cur_dest.available_bins[curr_point[1]-1] > 0:   # are there big bins available?
+                insert_to_bin(cur_dest,cur_pack,curr_point[0],curr_point[1]-1,NOW)
+                package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
+                return curr_point
+            else: #There are no big bins available
+                cur_pack.push_to_heap()
+                curr_point = next_point(curr_point[0],curr_point[1])
+                return curr_point        
     else:  
         cur_pack.push_to_heap()
         #print(f' done with ({curr_point})')
@@ -127,6 +138,7 @@ def update_packages_in_center():
             packages_in_center[j][total_packages]+=1
         else:
             packages_in_center[j][total_packages]=1
+        print(packages_in_center[j])
     
 
 ### main functions ####
@@ -298,5 +310,3 @@ while NOW < 91:
         end_location_fault_excecution(cur_event.destination)
     else:
         collect_after_fault_execution(NOW, cur_event.package)
-  
-
