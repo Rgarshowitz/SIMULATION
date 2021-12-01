@@ -88,6 +88,18 @@ def next_point(i,j):
     else:
         j+=1
         return (i,j)
+
+def simple_placing(cur_pack,i,j,NOW):
+    size_count=j
+    while size_count-1>=0:
+        neighbors=destinations[i].neighbors[size_count]
+        for k in range(len(neighbors)):
+            cur_dest=destinations[neighbors[k]]
+            if cur_dest.available_bins[size_count]>0:
+                insert_to_bin(cur_dest,cur_pack,i,j,NOW)
+                package_collection_creation(cur_pack, cur_pack.cur_location, NOW)
+        size_count-=1
+
     
 def place_pack(heap,curr_point,cur_dest):
     cur_pack = heapq.heappop(heap[(curr_point[0],curr_point[1])])
@@ -138,7 +150,6 @@ def update_packages_in_center():
             packages_in_center[j][total_packages]+=1
         else:
             packages_in_center[j][total_packages]=1
-        print(packages_in_center[j])
     
 
 ### main functions ####
@@ -149,6 +160,8 @@ def package_arrival_execution(NOW): #Create daily packages
     for i in range(1,7):
         for j in range(1,4):
             x = np.random.poisson(loc_size_destributions[(i,j)])
+            global packages_arrived
+            packages_arrived+=x
             if F ==0:
                 add_x_packages_to_heap(NOW,i,j,x)
             else:
@@ -178,6 +191,22 @@ def send_packages_execution(NOW):
     print(f'time: {NOW} - daily packages sent')
     package_arrival_creation(NOW)
 
+def send_packages_execution2(NOW):
+    send_packages_execution(NOW)
+    i,j = 1,1
+    while i < 7:
+        if len(regular_heap_dict[i,j])>0:
+            cur_pack=heapq.heappop(regular_heap_dict[i,j])
+            simple_placing(cur_pack,i,j,NOW)
+        elif j==3:
+            if i==6:
+                i+=1
+            else:
+                i+=1
+                j=1
+        else:
+            j+=1
+
 def package_collection_creation(package,p_cur_location,NOW):
     x,y = np.random.uniform(0,1), np.random.uniform(0,17.983/24)
     if package.destination.id==p_cur_location:
@@ -199,7 +228,7 @@ def package_collection_creation(package,p_cur_location,NOW):
         elif x<0.9:
             Event(NOW+3+y,"Collection",p_cur_location,package)
         else:
-            package.is_priority=False
+            package.is_priority=True
             global returned_num
             if (NOW+5)%7==0:
                 package.first_sending_option=mt.floor(NOW+6)
@@ -217,16 +246,19 @@ def package_collection_execution(NOW,package):
             if package.is_priority==False:
                 update_days_to_delivery(package)
                 print(f'{NOW}- package size {package.size} collected from loc {package.destination.id} bin size {package.bin_size}')
-
                 return
         else:
             w=np.random.uniform(1/24,5/24)
             package.destination.is_working=False
             end_location_fault_creation(NOW,package.destination)
     if package.is_priority==True:
+        global returned_priority
+        returned_priority+=1
         collect_after_fault_creation(NOW,package)
         return
     elif ((NOW+1)-package.first_sending_option)<4:
+        global returned_regular
+        returned_regular+=1
         collect_after_fault_creation(NOW,package)
         return
     else:
@@ -249,9 +281,7 @@ def end_location_fault_excecution(destination):
     destination.is_working = True
 
 def collect_after_fault_creation(NOW,package):
-    global returned_num
     y = np.random.uniform(6/24, 23.983/24)
-    returned_num+=1
     Event(mt.ceil(NOW)+y, "Collect After Fault", package.cur_location, package)
 
 def collect_after_fault_execution(NOW, package):
@@ -274,14 +304,17 @@ for i in range(1,7):
     destinations[i] = Destination(i)
 
 #Define Destinations neigbors 
-destinations[1].neighbors["big"], destinations[1].neighbors["medium"], destinations[1].neighbors["small"]=[2,3,4],[4,2,3],[4,2,3]
-destinations[2].neighbors["big"], destinations[2].neighbors["medium"], destinations[2].neighbors["small"]=[1,4],[1,4],[1,4]
-destinations[3].neighbors["big"], destinations[3].neighbors["medium"], destinations[3].neighbors["small"]=[1,5,4],[4,1,5],[4,1,5]
-destinations[4].neighbors["big"], destinations[4].neighbors["medium"], destinations[4].neighbors["small"]=[1,5,2,6,3],[6,2,5,1,3],[6,2,5,1,3]
-destinations[5].neighbors["big"], destinations[5].neighbors["medium"], destinations[5].neighbors["small"]=[6,3,4],[6,4,3],[6,4,3]
-destinations[6].neighbors["big"], destinations[6].neighbors["medium"], destinations[6].neighbors["small"]=[4,5],[4,5],[4,5]
+destinations[1].neighbors[1], destinations[1].neighbors[2], destinations[1].neighbors[3]=[2,3,4],[4,2,3],[4,2,3]
+destinations[2].neighbors[1], destinations[2].neighbors[2], destinations[2].neighbors[3]=[1,4],[1,4],[1,4]
+destinations[3].neighbors[1], destinations[3].neighbors[2], destinations[3].neighbors[3]=[1,5,4],[4,1,5],[4,1,5]
+destinations[4].neighbors[1], destinations[4].neighbors[2], destinations[4].neighbors[3]=[1,5,2,6,3],[6,2,5,1,3],[6,2,5,1,3]
+destinations[5].neighbors[1], destinations[5].neighbors[2], destinations[5].neighbors[3]=[6,3,4],[6,4,3],[6,4,3]
+destinations[6].neighbors[1], destinations[6].neighbors[2], destinations[6].neighbors[3]=[4,5],[4,5],[4,5]
 
 P=[]   #Event heap
+packages_arrived=0
+returned_priority=0
+returned_regular=0
 NOW=0   #Current simulation time
 simulation_time=91   #Overall simulation running time
 F=0   #indicates weather it is the first day for the simulation
@@ -310,3 +343,9 @@ while NOW < 91:
         end_location_fault_excecution(cur_event.destination)
     else:
         collect_after_fault_execution(NOW, cur_event.package)
+
+print(returned_num)
+print(returned_clients_num)
+print(packages_arrived)
+print(returned_regular)
+print(returned_priority)
