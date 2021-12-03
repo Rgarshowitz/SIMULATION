@@ -129,20 +129,17 @@ def place_pack(heap, curr_point, cur_dest):
         insert_to_bin(cur_dest, cur_pack, curr_point[1], NOW)
     elif curr_point[1]-1 >= 1:  # Am I small/Medium
         if curr_point[1]-2 >= 1:  # Am I small?
-            # are there medium bins available?
-            if cur_dest.available_bins[curr_point[1]-1] > 0:
+            if cur_dest.available_bins[curr_point[1]-1] > 0:  # are there medium bins available?
                 insert_to_bin(cur_dest, cur_pack, curr_point[1]-1, NOW)
                 return curr_point
-            # are there big bins available?
-            elif cur_dest.available_bins[curr_point[1]-2] > 0:
+            elif cur_dest.available_bins[curr_point[1]-2] > 0:   # are there big bins available?
                 insert_to_bin(cur_dest, cur_pack, curr_point[1]-2, NOW)
                 return curr_point
             else:
                 cur_pack.push_to_heap()
                 curr_point = next_point(curr_point[0], curr_point[1])
                 return curr_point
-        else:
-            # are there big bins available?
+        else:   # are there big bins available?
             if cur_dest.available_bins[curr_point[1]-1] > 0:
                 insert_to_bin(cur_dest, cur_pack, curr_point[1]-1, NOW)
                 return curr_point
@@ -192,18 +189,14 @@ def package_arrival_execution(NOW):  # Create daily packages
 
 
 def send_packages_creation(NOW):
-    if NOW==0:
-        Event(NOW+6/24, "Distribute")
-        return
-    elif NOW%7==0:
-        Event(NOW+1+6/24, "Distribute")
-
-    else:
-        Event(NOW+6/24, "Distribute")
+    Event(NOW+6/24, "Distribute")
 
 
 def send_packages_execution(NOW):
- 
+    if NOW%7==0:
+        package_arrival_creation(NOW)
+        send_packages_execution(NOW+1)
+        return
     curr_point = (1, 1)  # (i,j)
     while curr_point[0] < 7:
         cur_dest = destinations[curr_point[0]]
@@ -269,7 +262,7 @@ def package_collection_creation(package, NOW):
 
 
 def package_collection_execution(NOW, package):
-    if package.destination.is_working == True:
+    if destinations[package.cur_location].is_working == True:
         x = np.random.uniform(0, 1)
         if x > 0.01:
             destinations[package.cur_location].available_bins[package.bin_size] += 1
@@ -280,8 +273,9 @@ def package_collection_execution(NOW, package):
                 return
         else:
             w = np.random.uniform(1/24, 5/24)
-            package.destination.is_working = False
-            end_location_fault_creation(NOW, package.destination)
+            destinations[package.cur_location].is_working = False
+            #package.destination.is_working = False
+            end_location_fault_creation(NOW +w, destinations[package.cur_location])
             global count_faults
             count_faults += 1
 
@@ -323,7 +317,7 @@ def end_location_fault_excecution(destination):
 
 def collect_after_fault_creation(NOW, package):
     y = np.random.uniform(6/24, 23.983/24)
-    Event(mt.ceil(NOW)+y, "Collect After Fault", package.cur_location, package)
+    Event(mt.ceil(NOW)+y, "Collect After Fault", destinations[package.cur_location], package)
 
 
 def collect_after_fault_execution(NOW, package):
@@ -347,18 +341,12 @@ for i in range(1, 7):
 
 
 # Define Destinations neigbors
-destinations[1].neighbors[1], destinations[1].neighbors[2], destinations[1].neighbors[3] = [
-    2, 3, 4], [4, 2, 3], [4, 2, 3]
-destinations[2].neighbors[1], destinations[2].neighbors[2], destinations[2].neighbors[3] = [
-    1, 4], [1, 4], [1, 4]
-destinations[3].neighbors[1], destinations[3].neighbors[2], destinations[3].neighbors[3] = [
-    1, 5, 4], [4, 1, 5], [4, 1, 5]
-destinations[4].neighbors[1], destinations[4].neighbors[2], destinations[4].neighbors[3] = [
-    1, 5, 2, 6, 3], [6, 2, 5, 1, 3], [6, 2, 5, 1, 3]
-destinations[5].neighbors[1], destinations[5].neighbors[2], destinations[5].neighbors[3] = [
-    6, 3, 4], [6, 4, 3], [6, 4, 3]
-destinations[6].neighbors[1], destinations[6].neighbors[2], destinations[6].neighbors[3] = [
-    4, 5], [4, 5], [4, 5]
+destinations[1].neighbors[1], destinations[1].neighbors[2], destinations[1].neighbors[3] = [2, 3, 4], [4, 2, 3], [4, 2, 3]
+destinations[2].neighbors[1], destinations[2].neighbors[2], destinations[2].neighbors[3] = [1, 4], [1, 4], [1, 4]
+destinations[3].neighbors[1], destinations[3].neighbors[2], destinations[3].neighbors[3] = [1, 5, 4], [4, 1, 5], [4, 1, 5]
+destinations[4].neighbors[1], destinations[4].neighbors[2], destinations[4].neighbors[3] = [1, 5, 2, 6, 3], [6, 2, 5, 1, 3], [6, 2, 5, 1, 3]
+destinations[5].neighbors[1], destinations[5].neighbors[2], destinations[5].neighbors[3] = [6, 3, 4], [6, 4, 3], [6, 4, 3]
+destinations[6].neighbors[1], destinations[6].neighbors[2], destinations[6].neighbors[3] = [4, 5], [4, 5], [4, 5]
 count_faults = 0
 P = []  # Event heap
 packages_arrived = 0
@@ -370,12 +358,9 @@ simulation_time = 91  # Overall simulation running time
 F = 0  # indicates weather it is the first day for the simulation
 returned_num = 0  # Number of packages that has been returned to the logistics center
 returned_packs_due_to_fault = 0
-returned_packs_due_to_lazy_client = 0
-# number of clients that had to come back later because of destination malfunction
-returned_clients_num = 0
-# Dictionary that counts how many packages are left each days in center by size
-packages_in_center = {1: {}, 2: {}, 3: {}}
-# Counts how much time passed for each package in center for each destination, by days
+returned_packs_due_to_lazy_client = 0  # number of clients that had to come back later because of destination malfunction
+returned_clients_num = 0  # Dictionary that counts how many packages are left each days in center by size
+packages_in_center = {1: {}, 2: {}, 3: {}}  # Counts how much time passed for each package in center for each destination, by days
 days_to_delivery = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}, 6: {}}
 loc_size_destributions = {(1, 1): 1,  (1, 2): 3, (1, 3): 7,
                           (2, 1): 1.5, (2, 2): 2, (2, 3): 8,
@@ -396,7 +381,7 @@ while NOW < 91:
         package_collection_execution(NOW, cur_event.package)
     elif cur_event.type == "End Location Fault":
         end_location_fault_excecution(cur_event.destination)
-    else:
+    elif cur_event.type == "Collect After Fault":
         collect_after_fault_execution(NOW, cur_event.package)
     print(cur_event)
 
@@ -422,5 +407,3 @@ data_dict = {"packages_arrived": packages_arrived,"packages_collected": packages
 
 for item in data_dict:
     print(f'{item}:{data_dict[item]}')
-    
-days_to_delivery
