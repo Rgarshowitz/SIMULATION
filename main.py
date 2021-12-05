@@ -418,8 +418,22 @@ while NOW < 91:
     elif cur_event.type == "Missed Collection":
         missed_collection_execution(NOW,cur_event.package)
     
-    
-    print(cur_event)
+ #   print(cur_event)
+
+missing_sum=0
+
+for i in range(1,7):
+    for j in range(1,4):
+        #missing_sum += len(vip_heap_dict[i,j]) + len(regular_heap_dict[i,j])
+        while len(vip_heap_dict[i,j]) > 0:
+            pack1 = heapq.heappop(vip_heap_dict[i,j])
+            pack1.update_package_days_in_center(simulation_time)
+            update_days_to_delivery(pack1)
+        while len(regular_heap_dict[i,j]) > 0:
+            pack2 = heapq.heappop(regular_heap_dict[i,j])
+            pack2.update_package_days_in_center(simulation_time)
+            update_days_to_delivery(pack2)
+
 
 print(packages_arrived)
 print(packages_collected)
