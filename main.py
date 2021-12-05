@@ -4,8 +4,6 @@ import matplotlib.pyplot as plt
 import math as mt
 import pandas as pd
 
-
-
 class Event():
     def __init__(self, time, name, destination=None, package=None):
         self.time = time
@@ -28,11 +26,14 @@ class Event():
             return f'{self.time} - {self.destination} fixed'
         elif self.type == "Collect After Fault":
             return f'{self.time} - package collected after fault from {self.destination}' 
+        elif self.type == "Lazy client":
+            return f'{self.time} - package returned beacuse of lazy client' 
 
 class Package():
     def __init__(self, size, first_sending_option, destination):
         self.size = size
         self.first_sending_option = first_sending_option
+        self.second_sending_option = None
         self.destination = destination
         self.cur_location = None
         self.bin_size = None
@@ -40,6 +41,7 @@ class Package():
         self.ft_sent = None
         self.st_sent = None
         self.days_in_center = 0
+        self.current_time_in_bin = 0
 
     def __repr__(self):
         return f'size: {self.size} destination:{self.destination.id} first_sending_option:{self.first_sending_option}'
@@ -49,12 +51,25 @@ class Package():
 
     def push_to_heap(self):
         if self.is_priority == True:
-            heapq.heappush(
-                vip_heap_dict[(self.destination.id, self.size)], self)
+            heapq.heappush(vip_heap_dict[(self.destination.id, self.size)], self)
         else:
-            heapq.heappush(
-                regular_heap_dict[(self.destination.id, self.size)], self)
+            heapq.heappush(regular_heap_dict[(self.destination.id, self.size)], self)
+            
+    def update_time_in_bin(self,time):
+        if self.is_priority:
+            self.current_time_in_bin = time - self.st_sent
+        else:
+            self.current_time_in_bin = time - self.ft_sent
+            
+    def update_package_days_in_center(self,time):
+        if self.is_priority == False:
+            self.ft_sent = time            
+            self.days_in_center = mt.floor(self.ft_sent - self.first_sending_option)
+        else:
+            self.st_sent = time            
+            self.days_in_center += mt.floor(self.st_sent - self.second_sending_option)
 
+    
 
 class Destination():
     def __init__(self, id):
@@ -66,7 +81,6 @@ class Destination():
     def __repr__(self):
         return f'loc ID:{self.id} L:{self.available_bins[1]} M:{self.available_bins[2]} S:{self.available_bins[3]}, is working: {self.is_working}'
 
-
 #### sub Funcitons ####
 def add_x_packages_to_heap(NOW, i, j, x):  # adds x packages to heap (i,j)
     t = 0
@@ -75,18 +89,11 @@ def add_x_packages_to_heap(NOW, i, j, x):  # adds x packages to heap (i,j)
         t += 1
     return None
 
-
 def insert_to_bin(destination, package, bin_size, NOW):
     destination.available_bins[bin_size] -= 1
     package.bin_size = bin_size
     package.cur_location = destination.id
-    if package.is_priority:
-        package.st_sent = NOW
-        package.days_in_center += mt.floor(package.st_sent -
-                                           package.first_sending_option)
-    else:
-        package.ft_sent = NOW
-        package.days_in_center = mt.floor(package.ft_sent - package.first_sending_option)
+    package.update_package_days_in_center(NOW)
     package_collection_creation(package, NOW)
 
 
@@ -122,9 +129,13 @@ def simple_placing(cur_pack, NOW):
         size_count -= 1
 
 
-def place_pack(heap, curr_point, cur_dest):
+def place_pack(heap, curr_point, cur_dest,NOW):
     cur_pack = heapq.heappop(heap[(curr_point[0], curr_point[1])])
-
+    if cur_pack.is_priority:
+        if cur_pack.second_sending_option > NOW:
+            cur_pack.push_to_heap()
+            curr_point = next_point(curr_point[0], curr_point[1])
+            return curr_point  
     if cur_dest.available_bins[curr_point[1]] > 0:
         insert_to_bin(cur_dest, cur_pack, curr_point[1], NOW)
     elif curr_point[1]-1 >= 1:  # Am I small/Medium
@@ -150,7 +161,6 @@ def place_pack(heap, curr_point, cur_dest):
     else:
         cur_pack.push_to_heap()
         curr_point = next_point(curr_point[0], curr_point[1])
-
     return curr_point
 
 
@@ -159,12 +169,11 @@ def update_packages_in_center():
     for j in range(1, 4):
         total_packages = 0
         for i in range(1, 7):
-            total_packages += len(regular_heap_dict[i, j]) + \
-                len(vip_heap_dict[i, j])
-        if total_packages in packages_in_center[j].keys():
-            packages_in_center[j][total_packages] += 1
-        else:
-            packages_in_center[j][total_packages] = 1
+            total_packages += len(regular_heap_dict[i, j]) + len(vip_heap_dict[i, j])
+            if total_packages in packages_in_center[j].keys():
+                packages_in_center[j][total_packages] += 1
+            else:
+                packages_in_center[j][total_packages] = 1
 
 
 ### main functions ####
@@ -201,13 +210,11 @@ def send_packages_execution(NOW):
     while curr_point[0] < 7:
         cur_dest = destinations[curr_point[0]]
         if len(vip_heap_dict[(curr_point[0], curr_point[1])]) > 0:
-            curr_point = place_pack(vip_heap_dict, curr_point, cur_dest)
+            curr_point = place_pack(vip_heap_dict, curr_point, cur_dest,NOW)
         elif len(regular_heap_dict[(curr_point[0], curr_point[1])]) > 0:
-            curr_point = place_pack(regular_heap_dict, curr_point, cur_dest)
+            curr_point = place_pack(regular_heap_dict, curr_point, cur_dest,NOW)
         else:
-            #print(f' done with ({curr_point})')
             curr_point = next_point(curr_point[0], curr_point[1])
-            #print(f' next point:({curr_point})')
     update_packages_in_center()
     package_arrival_creation(NOW)
 
@@ -227,6 +234,22 @@ def send_packages_execution2(NOW):
                 j = 1
         else:
             j += 1
+            
+def package_returned_to_center_execution(NOW,package):
+    destinations[package.cur_location].available_bins[package.bin_size] += 1
+    package.is_priority = True
+    package.push_to_heap()
+    global returned_num
+    global returned_packs_due_to_lazy_client
+    returned_num +=1
+    returned_packs_due_to_lazy_client +=1  
+    if NOW%7 ==0:
+        package.second_sending_option = mt.ceil(NOW+1)
+    else:
+        package.second_sending_option = mt.ceil(NOW)
+        
+    
+    
 
 def package_collection_creation(package, NOW):
     x, y = np.random.uniform(0, 1), np.random.uniform(0, 17.983/24)
@@ -249,32 +272,36 @@ def package_collection_creation(package, NOW):
         elif x < 0.9:
             Event(NOW+3+y, "Collection", package.cur_location, package)
         else:
-            package.is_priority = True
-            global returned_num
-            global returned_packs_due_to_lazy_client
-            if mt.floor(NOW+5) % 7 == 0:
-                package.first_sending_option = mt.floor(NOW+6)
-            else:
-                package.first_sending_option = mt.floor(NOW+5)
-            returned_num += 1
-            returned_packs_due_to_lazy_client += 1
-            package.push_to_heap()
+            Event(NOW+4, "Lazy client", package.cur_location, package)
+         
+            
+            
+ #           package.is_priority = True
+ #           global returned_num
+ #           global returned_packs_due_to_lazy_client
+ #           if mt.floor(NOW+5) % 7 == 0:
+ #               package.second_sending_option = mt.floor(NOW+6)
+ #           else:
+ #               package.second_sending_option = mt.floor(NOW+5)
+ #           returned_num += 1
+ #           returned_packs_due_to_lazy_client += 1
+ #           package.push_to_heap()
 
 
 def package_collection_execution(NOW, package):
+    package.update_time_in_bin(NOW)
     if destinations[package.cur_location].is_working == True:
         x = np.random.uniform(0, 1)
         if x > 0.01:
             destinations[package.cur_location].available_bins[package.bin_size] += 1
-            if package.is_priority == False:
-                update_days_to_delivery(package)
-                global packages_collected
-                packages_collected += 1
-                return
+#            if package.is_priority == False:
+            update_days_to_delivery(package)
+            global packages_collected
+            packages_collected += 1
+            return
         else:
             w = np.random.uniform(1/24, 5/24)
             destinations[package.cur_location].is_working = False
-            #package.destination.is_working = False
             end_location_fault_creation(NOW +w, destinations[package.cur_location])
             global count_faults
             count_faults += 1
@@ -284,28 +311,26 @@ def package_collection_execution(NOW, package):
         returned_clients_for_priority_packs += 1
         collect_after_fault_creation(NOW, package)
         return
-    elif ((NOW+1)-package.first_sending_option) < 4:
+    elif mt.ceil(package.current_time_in_bin) > 4:
+        global returned_num
+        global returned_packs_due_to_fault
+        package.is_priority = True
+        returned_num += 1
+        returned_packs_due_to_fault += 1
+        if mt.ceil(NOW)%7 == 0:
+            package.second_sending_option = mt.floor(NOW)+2
+            package.push_to_heap()
+        else:
+            package.second_sending_option = mt.ceil(NOW)
+            package.push_to_heap()
+        return
+   
+    else:
         global returned_clients_for_regular_packs
         returned_clients_for_regular_packs += 1
         collect_after_fault_creation(NOW, package)
         return
-    else:
-        global returned_num
-        global returned_packs_due_to_fault
-
-        package.is_priority = True
-        if (NOW+1) % 7 == 0:
-            package.first_sending_option = mt.floor(NOW+2)
-            returned_num += 1
-            returned_packs_due_to_fault += 1
-            package.push_to_heap()
-        else:
-            package.first_sending_option = mt.floor(NOW+1)
-            returned_num += 1
-            returned_packs_due_to_fault += 1
-            package.push_to_heap()
-
-
+  
 def end_location_fault_creation(NOW, destination):
     t = np.random.uniform(1/24, 5/24)
     Event(NOW+t, "End Location Fault", destination)
@@ -324,6 +349,8 @@ def collect_after_fault_execution(NOW, package):
     global returned_clients_num
     returned_clients_num += 1
     package_collection_execution(NOW, package)
+    
+
 
 
 # create 18 package heaps in two dictionareis Vip and regular : the dict key is the heap name (i,j) value heap the
@@ -376,34 +403,18 @@ while NOW < 91:
     if cur_event.type == "Arrival":
         package_arrival_execution(NOW)
     elif cur_event.type == "Distribute":
-        send_packages_execution(NOW)
+        send_packages_execution2(NOW)
     elif cur_event.type == "Collection":
         package_collection_execution(NOW, cur_event.package)
     elif cur_event.type == "End Location Fault":
         end_location_fault_excecution(cur_event.destination)
     elif cur_event.type == "Collect After Fault":
         collect_after_fault_execution(NOW, cur_event.package)
+    elif cur_event.type == "Lazy client":
+        package_returned_to_center_execution(NOW,cur_event.package)
+    
+    
     print(cur_event)
 
 
-plt.rcParams["figure.figsize"] = (20,5)
 
-fig, (plot1, plot2, plot3) = plt.subplots(1,3)
-plot1.bar(pd.Series(packages_in_center[1]).sort_index().keys(),height=pd.Series(packages_in_center[1]).sort_index().values,color = "r")
-plot2.bar(pd.Series(packages_in_center[2]).sort_index().keys(),height=pd.Series(packages_in_center[2]).sort_index().values,color = "g")
-plot3.bar(pd.Series(packages_in_center[3]).sort_index().keys(),height=pd.Series(packages_in_center[3]).sort_index().values,color = "b")
-
-plot1.set_title('Large Packages in Center')
-plot2.set_title('Medium Packages in Center')
-plot3.set_title('Small Packages in Center')
-
-fig.tight_layout()
-
-data_dict = {"packages_arrived": packages_arrived,"packages_collected": packages_collected,
-             "returned_clients_num":returned_clients_num,"returned_clients_for_priority_packs":returned_clients_for_priority_packs,
-             "returned_clients_for_regular_packs": returned_clients_for_regular_packs,"count_faults":count_faults,
-            "returned_num":returned_num,"returned_packs_due_to_fault":returned_packs_due_to_fault,
-            "returned_packs_due_to_lazy_client":returned_packs_due_to_lazy_client}
-
-for item in data_dict:
-    print(f'{item}:{data_dict[item]}')
