@@ -84,6 +84,14 @@ class Destination():
     def __repr__(self):
         return f'loc ID:{self.id} L:{self.available_bins[1]} M:{self.available_bins[2]} S:{self.available_bins[3]}, is working: {self.is_working}'
 
+class Simulation():
+    def __init__(self,simnum):
+        self.P = []
+        self.packages_arrived = 0
+        self.packages_collected = 0
+        self.returned_clients_for_priority_packs = 0
+        self.returned_clients_for_regular_packs = 0
+
 #### sub Funcitons ####
 def add_x_packages_to_heap(first_sending_option, i, j, x):  # adds x packages to heap (i,j)
     t = 0
@@ -193,7 +201,6 @@ def package_arrival_execution(NOW):  # Create daily packages
         for j in range(1, 4):
             x = np.random.poisson(loc_size_destributions[(i, j)])
             global packages_arrived
-            packages_arrived += x
             if NOW == 0:
                 add_x_packages_to_heap(NOW, i, j, x)
             else:
@@ -286,7 +293,6 @@ def package_collection_execution(NOW, package):
             destinations[package.cur_location].available_bins[package.bin_size] += 1
             update_days_to_delivery(package)
             global packages_collected
-            packages_collected += 1
             return
         else:
             w = np.random.uniform(1/24, 5/24)
@@ -297,7 +303,6 @@ def package_collection_execution(NOW, package):
 
     if package.is_priority == True:
         global returned_clients_for_priority_packs
-        returned_clients_for_priority_packs += 1
         collect_after_fault_creation(NOW, package)
         return
     elif mt.ceil(package.current_time_in_bin) > 4:
@@ -305,7 +310,6 @@ def package_collection_execution(NOW, package):
         global returned_packs_due_to_fault
         package.is_priority = True
         returned_num += 1
-        returned_packs_due_to_fault += 1
         if mt.ceil(NOW+1)%7 == 0:
             package.second_sending_option = mt.ceil(NOW)+1
             package.push_to_heap()
@@ -316,7 +320,6 @@ def package_collection_execution(NOW, package):
    
     else:
         global returned_clients_for_regular_packs
-        returned_clients_for_regular_packs += 1
         collect_after_fault_creation(NOW, package)
         return
 
@@ -334,7 +337,6 @@ def missed_collection_execution(NOW,package):
     global returned_num
     global returned_packs_due_to_lazy_client
     returned_num +=1
-    returned_packs_due_to_lazy_client +=1 
   
 def end_location_fault_creation(NOW, destination):
     t = np.random.uniform(1/24, 5/24)
@@ -354,93 +356,71 @@ def collect_after_fault_execution(NOW, package):
     global returned_clients_num
     returned_clients_num += 1
     package_collection_execution(NOW, package)
-    
 
+returned_clients_num = 0
+returned_num = 0
+packages_in_center = {1: {}, 2: {}, 3: {}}  # Dictionary that counts how many packages are left each days in center by size
+days_to_delivery = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}, 6: {}}  # Counts how much time passed for each package in center for each destination, by days
 
+for Qsim in range(10):
+    vip_heap_dict = {}
+    for i in range(1, 7):
+        for j in range(1, 4):
+            vip_heap_dict[i, j] = []
+    regular_heap_dict = {}
+    for i in range(1, 7):
+        for j in range(1, 4):
+            regular_heap_dict[i, j] = []
+    destinations = {}
+    for i in range(1, 7):
+        destinations[i] = Destination(i)
+    # Define Destinations neigbors
+    destinations[1].neighbors[1], destinations[1].neighbors[2], destinations[1].neighbors[3] = [2, 3, 4], [4, 2, 3], [4, 2, 3]
+    destinations[2].neighbors[1], destinations[2].neighbors[2], destinations[2].neighbors[3] = [1, 4], [1, 4], [1, 4]
+    destinations[3].neighbors[1], destinations[3].neighbors[2], destinations[3].neighbors[3] = [1, 5, 4], [4, 1, 5], [4, 1, 5]
+    destinations[4].neighbors[1], destinations[4].neighbors[2], destinations[4].neighbors[3] = [1, 5, 2, 6, 3], [6, 2, 5, 1, 3], [6, 2, 5, 1, 3]
+    destinations[5].neighbors[1], destinations[5].neighbors[2], destinations[5].neighbors[3] = [6, 3, 4], [6, 4, 3], [6, 4, 3]
+    destinations[6].neighbors[1], destinations[6].neighbors[2], destinations[6].neighbors[3] = [4, 5], [4, 5], [4, 5]
+    count_faults = 0
+    P = []  # Event heap
+    NOW = 0  # Current simulation time
+    simulation_time = 91  # Overall simulation running time
+    days_to_delivery = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}, 6: {}}  # Counts how much time passed for each package in center for each destination, by days
+    loc_size_destributions = {(1, 1): 1,  (1, 2): 3, (1, 3): 7,
+                            (2, 1): 1.5, (2, 2): 2, (2, 3): 8,
+                            (3, 1): 2,  (3, 2): 4, (3, 3): 12,
+                            (4, 1): 3,  (4, 2): 1, (4, 3): 5,
+                            (5, 1): 1,  (5, 2): 3, (5, 3): 8,
+                            (6, 1): 1.5, (6, 2): 1, (6, 3): 3}
+    Event(NOW, "Arrival")
+    while NOW < 91:
+        cur_event = heapq.heappop(P)
+        NOW = cur_event.time
+        if cur_event.type == "Arrival":
+            package_arrival_execution(NOW)
+        elif cur_event.type == "Distribute":
+            send_packages_execution(NOW,2)
+        elif cur_event.type == "Collection":
+            package_collection_execution(NOW, cur_event.package)
+        elif cur_event.type == "End Location Fault":
+            end_location_fault_excecution(cur_event.destination)
+        elif cur_event.type == "Collect After Fault":
+            collect_after_fault_execution(NOW, cur_event.package)
+        elif cur_event.type == "Missed Collection":
+            missed_collection_execution(NOW,cur_event.package)
+    for i in range(1,7):
+        for j in range(1,4):
+            while len(vip_heap_dict[i,j]) > 0:
+                pack1 = heapq.heappop(vip_heap_dict[i,j])
+                pack1.update_package_days_in_center(simulation_time)
+                update_days_to_delivery(pack1)
+            while len(regular_heap_dict[i,j]) > 0:
+                pack2 = heapq.heappop(regular_heap_dict[i,j])
+                pack2.update_package_days_in_center(simulation_time)
+                update_days_to_delivery(pack2)
 
-# create 18 package heaps in two dictionareis Vip and regular : the dict key is the heap name (i,j) value heap the
-vip_heap_dict = {}
-for i in range(1, 7):
-    for j in range(1, 4):
-        vip_heap_dict[i, j] = []
-regular_heap_dict = {}
-for i in range(1, 7):
-    for j in range(1, 4):
-        regular_heap_dict[i, j] = []
-destinations = {}
-for i in range(1, 7):
-    destinations[i] = Destination(i)
-
-
-# Define Destinations neigbors
-destinations[1].neighbors[1], destinations[1].neighbors[2], destinations[1].neighbors[3] = [2, 3, 4], [4, 2, 3], [4, 2, 3]
-destinations[2].neighbors[1], destinations[2].neighbors[2], destinations[2].neighbors[3] = [1, 4], [1, 4], [1, 4]
-destinations[3].neighbors[1], destinations[3].neighbors[2], destinations[3].neighbors[3] = [1, 5, 4], [4, 1, 5], [4, 1, 5]
-destinations[4].neighbors[1], destinations[4].neighbors[2], destinations[4].neighbors[3] = [1, 5, 2, 6, 3], [6, 2, 5, 1, 3], [6, 2, 5, 1, 3]
-destinations[5].neighbors[1], destinations[5].neighbors[2], destinations[5].neighbors[3] = [6, 3, 4], [6, 4, 3], [6, 4, 3]
-destinations[6].neighbors[1], destinations[6].neighbors[2], destinations[6].neighbors[3] = [4, 5], [4, 5], [4, 5]
-count_faults = 0
-P = []  # Event heap
-packages_arrived = 0
-packages_collected = 0
-returned_clients_for_priority_packs = 0
-returned_clients_for_regular_packs = 0
-NOW = 0  # Current simulation time
-simulation_time = 91  # Overall simulation running time
-F = 0  # indicates weather it is the first day for the simulation
-returned_num = 0  # Number of packages that has been returned to the logistics center
-returned_packs_due_to_fault = 0
-returned_packs_due_to_lazy_client = 0  # number of clients that had to come back later because of destination malfunction
-returned_clients_num = 0  # Dictionary that counts how many packages are left each days in center by size
-packages_in_center = {1: {}, 2: {}, 3: {}}  # Counts how much time passed for each package in center for each destination, by days
-days_to_delivery = {1: {}, 2: {}, 3: {}, 4: {}, 5: {}, 6: {}}
-loc_size_destributions = {(1, 1): 1,  (1, 2): 3, (1, 3): 7,
-                          (2, 1): 1.5, (2, 2): 2, (2, 3): 8,
-                          (3, 1): 2,  (3, 2): 4, (3, 3): 12,
-                          (4, 1): 3,  (4, 2): 1, (4, 3): 5,
-                          (5, 1): 1,  (5, 2): 3, (5, 3): 8,
-                          (6, 1): 1.5, (6, 2): 1, (6, 3): 3}
-
-Event(NOW, "Arrival")
-while NOW < 91:
-    cur_event = heapq.heappop(P)
-    NOW = cur_event.time
-    if cur_event.type == "Arrival":
-        package_arrival_execution(NOW)
-    elif cur_event.type == "Distribute":
-        send_packages_execution(NOW,2)
-    elif cur_event.type == "Collection":
-        package_collection_execution(NOW, cur_event.package)
-    elif cur_event.type == "End Location Fault":
-        end_location_fault_excecution(cur_event.destination)
-    elif cur_event.type == "Collect After Fault":
-        collect_after_fault_execution(NOW, cur_event.package)
-    elif cur_event.type == "Missed Collection":
-        missed_collection_execution(NOW,cur_event.package)
-    
- #   print(cur_event)
-
-missing_sum=0
-
-for i in range(1,7):
-    for j in range(1,4):
-        #missing_sum += len(vip_heap_dict[i,j]) + len(regular_heap_dict[i,j])
-        while len(vip_heap_dict[i,j]) > 0:
-            pack1 = heapq.heappop(vip_heap_dict[i,j])
-            pack1.update_package_days_in_center(simulation_time)
-            update_days_to_delivery(pack1)
-        while len(regular_heap_dict[i,j]) > 0:
-            pack2 = heapq.heappop(regular_heap_dict[i,j])
-            pack2.update_package_days_in_center(simulation_time)
-            update_days_to_delivery(pack2)
-
-
-print(packages_arrived)
-print(packages_collected)
 print(returned_clients_num)
 print(returned_num)
-print(returned_packs_due_to_fault)
-print(returned_packs_due_to_lazy_client)
 print(count_faults)
 KaKi=0
 for key in days_to_delivery.keys():
